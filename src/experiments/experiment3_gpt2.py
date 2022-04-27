@@ -4,9 +4,10 @@ import os
 from os import path
 from transformers import GPT2LMHeadModel, GPT2TokenizerFast
 
-from gpt2 import GPT2
+from gpt2 import GPT2, gpt2_train
 from gpt2.GPT2 import GPT2
 from utils.utils import print_title, compute_text_avg_perplexity_window
+import json
 
 
 # ----------------------------------------- #
@@ -93,12 +94,23 @@ def run_experiment(training_epochs):
                 print("Folder " + train_model_output_dir + " already exists and is not empty.")
             else:
                 print("Start training for " + leave_out_subject_id + "...")
-                gpt2 = GPT2()
-                gpt2.train_and_save(train_model_output_dir,
-                                    train_set_file_path,
-                                    configuration.experiment3_gpt2_model_name,
-                                    str(configuration.experiment3_gpt2_batch_size),
-                                    str(training_epochs))
+
+                # Build training arguments dictionary
+                args = {"output_dir": train_model_output_dir,
+                        "model_name_or_path": configuration.experiment3_gpt2_model_name,
+                        "do_train": "y",
+                        "train_file": train_set_file_path,
+                        "per_device_train_batch_size": configuration.experiment3_gpt2_batch_size,
+                        "num_train_epochs": training_epochs}
+
+                # Write training arguments file
+                with open(configuration.experiment3_gpt2_arguments_file, 'w') as f:
+                    json.dump(args, f)
+                print("Training arguments:\n\n" + str(args))
+
+                # Run training with training file parameter
+                gpt2_train.train_model(["", configuration.experiment3_gpt2_arguments_file])
+
                 print("Training has been completed!")
 
 
@@ -125,12 +137,23 @@ def run_experiment(training_epochs):
                 print("Folder " + train_model_output_dir + " already exists and is not empty.")
             else:
                 print("Start training for " + leave_out_subject_id + "...")
-                gpt2 = GPT2()
-                gpt2.train_and_save(train_model_output_dir,
-                                    train_set_file_path,
-                                    configuration.experiment3_gpt2_model_name,
-                                    str(configuration.experiment3_gpt2_batch_size),
-                                    str(training_epochs))
+
+                # Build training arguments dictionary
+                args = {"output_dir": train_model_output_dir,
+                        "model_name_or_path": configuration.experiment3_gpt2_model_name,
+                        "do_train": "y",
+                        "train_file": train_set_file_path,
+                        "per_device_train_batch_size": configuration.experiment3_gpt2_batch_size,
+                        "num_train_epochs": training_epochs}
+
+                # Write training arguments file
+                with open(configuration.experiment3_gpt2_arguments_file, 'w') as f:
+                    json.dump(args, f)
+                print("Training arguments:\n\n" + str(args))
+
+                # Run training with training file parameter
+                gpt2_train.train_model(["", configuration.experiment3_gpt2_arguments_file])
+
                 print("Training has been completed!")
 
     # ---------------------------------------------------------------------------------------------------------------- #
