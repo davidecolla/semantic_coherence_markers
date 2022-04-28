@@ -46,6 +46,7 @@ experiment2_gpt2_models_base_path = experiment2_models_base_path + "gpt2/"
 # -------------------------------------- #
 #               Experiment 3             #
 # -------------------------------------- #
+experiment3_raw_data_base_path = "../resources/data/experiment3/input/pitt_raw/"
 experiment3_data_base_path = "../resources/data/experiment3/input/pitt/"
 experiment3_train_data_base_path = "../resources/data/experiment3/datasets/"
 experiment3_models_base_path = "../resources/models/experiment3/"

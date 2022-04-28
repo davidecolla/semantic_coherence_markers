@@ -8,6 +8,7 @@ from gpt2 import GPT2, gpt2_train
 from gpt2.GPT2 import GPT2
 from utils.utils import print_title, compute_text_avg_perplexity_window
 import json
+import re
 
 
 # ----------------------------------------- #
@@ -26,6 +27,10 @@ def run_experiment(training_epochs):
     data_base_path = configuration.experiment3_data_base_path
     models_base_path = configuration.experiment3_gpt2_models_base_path
 
+    # Preprocessing CHAT files
+    preprocess_pitt_corpus_data()
+
+    # Generate Concatenation of all files
     build_all_data()
 
     # ------------------------------------------------------- #
@@ -272,6 +277,91 @@ def run_experiment(training_epochs):
     write_csv_pitt(group_patient_ppl_dictionary, out_file)
 
 
+def replace_sentence_tokens(sent):
+    sent = sent.replace("*PAR:", "")
+    sent = sent.replace("[/]", "")
+    sent = sent.replace("[//]", "")
+    sent = sent.replace("<", "")
+    sent = sent.replace(">", "")
+    sent = sent.replace("(", "")
+    sent = sent.replace(")", "")
+    sent = sent.replace(">", "")
+    sent = sent.replace("‡", "")
+    sent = sent.replace("-", "")
+    sent = sent.replace("„", "")
+    sent = sent.replace("ʌ", "a")
+    sent = re.sub(r'@[a-z:\$\*]+', '', sent)
+    sent = re.sub(r'\+[\$\*\\\+\"\^\?\!\.\/]+', '', sent)
+    sent = re.sub(r'&=[a-z]+', '', sent)
+    sent = re.sub(r'[0-9]+', '', sent)
+    sent = re.sub(r'\[.*\]', '', sent)
+    sent = sent.replace("&", "")
+    sent = sent.replace("+", "")
+    sent = re.sub(r'[\:]+', '', sent)
+    sent = re.sub(r'[\.]+', '', sent)
+    sent = re.sub(r'[\x15]+', '', sent)
+    sent = sent.replace("_", "")
+    sent = sent.replace("www", "")
+    sent = sent.replace("xxx", "")
+    sent = sent.replace("yyy", "")
+    sent = ' '.join(sent.split())
+    sent = re.sub(r'[ ]+', ' ', sent)
+    sent = sent.strip()
+
+    return sent
+
+def preprocess_pitt_corpus_data():
+    raw_control_base_path = configuration.experiment3_raw_data_base_path + "control/"
+    raw_dementia_base_path = configuration.experiment3_raw_data_base_path + "dementia/"
+
+    control_base_path = configuration.experiment3_data_base_path + "control/"
+    dementia_base_path = configuration.experiment3_data_base_path + "dementia/"
+    if not os.path.exists(control_base_path) or not os.path.exists(dementia_base_path) or len(os.listdir(control_base_path)) == 0 or len(os.listdir(dementia_base_path)) == 0:
+        os.makedirs(control_base_path, exist_ok=True)
+        os.makedirs(dementia_base_path, exist_ok=True)
+
+        for file in os.listdir(raw_control_base_path):
+            file_content = open(raw_control_base_path + file, 'r').read().split("\n")
+            clean_text = ""
+            for i, line in enumerate(file_content):
+                if line.startswith("*PAR:"):
+                    # clean_text += replace_sentence_tokens(line)
+                    clean_text += line + "\n"
+                    if re.match(re.compile(r" +"),clean_text):
+                        clean_text = ""
+                elif line.startswith("\t") and (file_content[i - 1].startswith("*PAR")):
+                    clean_text = clean_text[0:len(clean_text)-1]
+                    clean_text +=  " " + line[1:] + "\n"
+
+            # if file == "709-2.cha":
+            #     print(clean_text)
+            clean_text = replace_sentence_tokens(clean_text)
+            # if file == "709-2.cha":
+            #     print(clean_text)
+
+            if clean_text != "" and clean_text != " " and not clean_text.isspace():
+                file_name = file.split(".")[0]
+                open(control_base_path + file_name + ".txt", "w").write(clean_text)
+
+        for file in os.listdir(raw_dementia_base_path):
+            file_content = open(raw_dementia_base_path + file, 'r').read().split("\n")
+            clean_text = ""
+            for i, line in enumerate(file_content):
+                if line.startswith("*PAR:"):
+                    # clean_text += replace_sentence_tokens(line)
+                    clean_text += line + "\n"
+                    if re.match(re.compile(r" +"), clean_text):
+                        clean_text = ""
+                elif line.startswith("\t") and (file_content[i - 1].startswith("*PAR")):
+                    clean_text = clean_text[0:len(clean_text) - 1]
+                    clean_text += " " + line[1:] + "\n"
+
+            clean_text = replace_sentence_tokens(clean_text)
+
+            if clean_text != "" and clean_text != " " and not clean_text.isspace():
+                file_name = file.split(".")[0]
+                open(dementia_base_path + file_name + ".txt", "w").write(clean_text)
+
 def build_all_data():
     data_base_path = configuration.experiment3_data_base_path
     controls = get_partition_subjects_dictionary("control")
@@ -351,7 +441,6 @@ def build_leave_one_out(partition):
         # --- Build train set for psycho_test_name and leave_out_subject_id ---
         # Building train set for leave_out_subject_id means concatenate texts of
         # all interviews except for leave_out_subject_id
-        # print("Building train set for leave_out: " + leave_out_subject_id)
         build_train_set_for_subject_leave_one_out(leave_out_subject_id, subject_id_interview_id, train_set_file_path,
                                                   base_path)
 

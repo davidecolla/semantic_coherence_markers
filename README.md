@@ -25,8 +25,8 @@ The final folders structure should resemble the following image:
 
 ##### Experiment 3
 Running the third experiment requires to have access to the [DementiaBank's Pitt Corpus](https://dementia.talkbank.org/access/English/Pitt.html).
-Once Pitt Corpus have been downloaded, retain the interviews related to the Cookie Theft only. The data have to be placed into a directory named `pitt`, such directory have to contains two subdirectories `control` and `dementia`. All the speeches from the control group have to be placed into the `control` directory, while the `dementia` directory have to contain all the speeches from the AD group. 
-The `pitt` directory should be placed in the following folder `data/experiment3/input/`.
+Once Pitt Corpus have been downloaded, retain the interviews related to the Cookie Theft only. The data have to be placed into a directory named `pitt_raw`, such directory have to contains two subdirectories `control` and `dementia`. All the speeches from the control group have to be placed into the `control` directory, while the `dementia` directory have to contain all the speeches from the AD group. 
+The `pitt_raw` directory should be placed in the following folder `data/experiment3/input/`.
 
 The final folders structure should resemble the following image:
 

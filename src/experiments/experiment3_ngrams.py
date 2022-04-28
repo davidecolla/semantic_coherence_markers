@@ -1,7 +1,8 @@
 from config import configuration
 from tqdm import tqdm
 
-from experiments.experiment3_gpt2 import build_leave_one_out, get_partition_subjects_dictionary, build_all_data
+from experiments.experiment3_gpt2 import build_leave_one_out, get_partition_subjects_dictionary, build_all_data, \
+    preprocess_pitt_corpus_data
 from utils.ngrams import train_ngrams, compute_perplexity
 from utils.utils import print_title
 
@@ -15,6 +16,9 @@ def run_experiment(order):
     # --- Build paths for cookie test ---
     # "../resources/data/experiment3/input/pitt/"
     data_base_path = configuration.experiment3_data_base_path
+
+    # Preprocessing CHAT files
+    preprocess_pitt_corpus_data()
 
     # Generate Concatenation of all files
     build_all_data()
