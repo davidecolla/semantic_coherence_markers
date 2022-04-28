@@ -102,7 +102,7 @@ def run_experiment(training_epochs):
             # --- Test on other categories ---
             for other_category in os.listdir(leave_one_out_base_path):
 
-                if other_category != category and other_category != "datasets":
+                if other_category != category and other_category != "datasets" and not other_category.startswith("."):
                     other_category_folder = leave_one_out_base_path + other_category + "/"
                     subject_interview_perplexity[category][other_category] = {}
 
@@ -160,7 +160,7 @@ def build_leave_one_out_dataset_speeches_trump():
     out_base_path = configuration.experiment1_train_data_base_path
 
     for category in os.listdir(base_path):
-        if category != "datasets":
+        if category != "datasets" and not category.startswith("."):
             category_folder = base_path + category + "/"
 
             for leave_out_speech_file_name in os.listdir(category_folder):

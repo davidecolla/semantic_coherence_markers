@@ -23,7 +23,7 @@ def run_experiment(training_epochs):
 
     # {PRJ_HOME}/resources/data/experiment2/input/obama/
     for speaker in os.listdir(configuration.experiment2_speeches_base_path):
-        if speaker != "." and speaker != ".." and speaker != "datasets":
+        if speaker != "." and speaker != ".." and speaker != "datasets" and not speaker.startswith("."):
 
             print("Generating Dataset...")
             build_speech_dataset(speaker)
@@ -81,7 +81,7 @@ def run_experiment(training_epochs):
 
 
             for other_speaker in tqdm(os.listdir(train_data_directory), desc=("Computing ppl with model of " + speaker)):
-                if other_speaker != "." and other_speaker != ".." and other_speaker != speaker:
+                if other_speaker != "." and other_speaker != ".." and other_speaker != speaker and not other_speaker.startswith("."):
 
                     other_speaker_base_path = configuration.experiment2_speeches_base_path + other_speaker + "/"
                     other_speaker_ppls = []

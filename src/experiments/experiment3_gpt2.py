@@ -26,6 +26,8 @@ def run_experiment(training_epochs):
     data_base_path = configuration.experiment3_data_base_path
     models_base_path = configuration.experiment3_gpt2_models_base_path
 
+    build_all_data()
+
     # ------------------------------------------------------- #
     #          1. Train Single LM on ALL Control group        #
     # ------------------------------------------------------- #
@@ -268,6 +270,34 @@ def run_experiment(training_epochs):
     out_file = configuration.experiment3_output_base_path + "GPT-2_EP=" + str(training_epochs) + ".csv"
     print("Writing results to: " + out_file)
     write_csv_pitt(group_patient_ppl_dictionary, out_file)
+
+
+def build_all_data():
+    data_base_path = configuration.experiment3_data_base_path
+    controls = get_partition_subjects_dictionary("control")
+    ad = get_partition_subjects_dictionary("dementia")
+
+    control_texts = ""
+    ad_texts = ""
+
+    for file in os.listdir(data_base_path + "control/"):
+        if not file.startswith(".") and file != "datasets":
+            subject = file.split("-")[0]
+            file_content = open(data_base_path + "control/" + file, 'r').read().replace("\n\n", "\n")
+            if subject in controls:
+                control_texts += file_content + "\n"
+
+    for file in os.listdir(data_base_path + "dementia/"):
+        if not file.startswith(".") and file != "datasets":
+            subject = file.split("-")[0]
+            file_content = open(data_base_path + "dementia/" + file, 'r').read().replace("\n\n", "\n")
+            if subject in ad:
+                ad_texts += file_content + "\n"
+
+    os.makedirs(data_base_path + "ALL/", exist_ok=True)
+    print(data_base_path + "ALL/")
+    open(data_base_path + "ALL/control.txt", "w").write(control_texts)
+    open(data_base_path + "ALL/dementia.txt", "w").write(ad_texts)
 
 
 def get_partition_subjects_dictionary(partition):
