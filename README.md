@@ -32,6 +32,9 @@ The final folders structure should resemble the following image:
 
 ![Folders structure for the third experiment](misc/folders_experiment3.png)
 
+where both control and dementia directories contain all the transcriptions from the Pitt Corpus as follows:
+![Folders structure for the third experiment](misc/folders_experiment31.png)
+
 #### 3 - Download pre-trained models and fine-tuned models
 Download GPT2 data from [this link](https://drive.google.com/file/d/1YYMmFlwrNnuQSgUnDlteSrLopm82VyCo/view?usp=sharing) (295GB) and unpack the archive in the resource folder.
 
