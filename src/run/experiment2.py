@@ -24,6 +24,8 @@ def main():
 
 def compute_icc():
 
+    # Exploit the IRR package as explained
+    # https://www.statology.org/intraclass-correlation-coefficient/
     # Install IRR R package
     utils = importr('utils')
     utils.chooseCRANmirror(ind=1)  # select the first mirror in the list
