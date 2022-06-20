@@ -8,7 +8,7 @@ from nltk import word_tokenize, sent_tokenize
 import math
 
 
-def train_ngrams(text, order, replace_with_unk=True):
+def train_ngrams(text, order, vocabulary_file, replace_with_unk=True):
     # # ------------------- Build n-grams --------------- #
     tokenized_text = [list(map(str.lower, word_tokenize(sent))) for sent in sent_tokenize(text)]
 
@@ -30,7 +30,10 @@ def train_ngrams(text, order, replace_with_unk=True):
                     tokenized_text[i][j] = "UNK"
     # -------------------------------------------------
 
-    train_data, padded_vocab = padded_everygram_pipeline(order, tokenized_text)
+    all_text = open(vocabulary_file, 'r').read()
+    _, padded_vocab = padded_everygram_pipeline(order, all_text)
+    train_data, _ = padded_everygram_pipeline(order, tokenized_text)
+    # train_data, padded_vocab = padded_everygram_pipeline(order, tokenized_text)
     # discount = 0.1
     model = KneserNeyInterpolated(order)
     model.fit(train_data, padded_vocab)

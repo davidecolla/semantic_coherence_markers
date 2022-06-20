@@ -160,7 +160,7 @@ def build_leave_one_out_dataset_speeches_trump():
     out_base_path = configuration.experiment1_train_data_base_path
 
     for category in os.listdir(base_path):
-        if category != "datasets" and not category.startswith("."):
+        if category != "datasets" and category != "all_transcripts.txt" and not category.startswith("."):
             category_folder = base_path + category + "/"
 
             for leave_out_speech_file_name in os.listdir(category_folder):

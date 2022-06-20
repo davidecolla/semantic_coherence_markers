@@ -16,6 +16,9 @@ def run_experiment(order):
 
     print_title("Experiment 2 - " + str(order) + "-grams")
 
+    vocabulary_fp = '../resources/data/experiment2/input/all_transcripts.txt'
+    build_vocabulary_file(vocabulary_fp)
+
     speech_perplexity = {}
 
     # {PRJ_HOME}/resources/data/experiment2/input/obama/
@@ -32,7 +35,7 @@ def run_experiment(order):
             train_set_file_path = base_path + "train.txt"
 
             text = open(train_set_file_path, 'r').read()
-            model = train_ngrams(text, order)
+            model = train_ngrams(text, order, vocabulary_fp)
 
 
             # ------------------------------------------------------------------------------- #
@@ -100,6 +103,19 @@ def write_csv(speeches_perplexity, out_file):
 
     with open(out_file, 'w') as f:
         f.write(csv)
+
+def build_vocabulary_file(vocabulary_fp):
+    all_text = ""
+    for speaker in os.listdir(configuration.experiment2_speeches_base_path):
+        if not speaker.startswith(".") and speaker != "datasets":
+            speaker_folder = configuration.experiment2_speeches_base_path + speaker + "/"
+
+            for speaker_transcript in os.listdir(speaker_folder):
+                category_file = speaker_folder + speaker_transcript
+                file_content = open(category_file, 'r').read()
+                all_text += file_content + "\n"
+
+    open(vocabulary_fp, 'w').write(all_text)
 
 
 if __name__ == '__main__':

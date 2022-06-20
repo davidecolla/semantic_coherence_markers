@@ -17,6 +17,9 @@ def run_experiment(order):
 
     build_leave_one_out_dataset_speeches_trump()
 
+    vocabulary_fp = '../resources/data/experiment1/input/all_transcripts.txt'
+    build_vocabulary_file(vocabulary_fp)
+
     base_path = configuration.experiment1_train_data_base_path
     subject_interview_perplexity = {}
 
@@ -40,7 +43,7 @@ def run_experiment(order):
                 text = f.read()
 
             # # ------------------------- Train N-grams ------------------------- #
-            model = train_ngrams(text, order)
+            model = train_ngrams(text, order, vocabulary_fp)
             # # ----------------------------------------------------------------- #
 
             # # ------------------------------------------------------------ #
@@ -68,7 +71,7 @@ def run_experiment(order):
         # # ---------------------------------------------------------------------------------- #
 
         # Retrain ngrams
-        model = train_ngrams(category_training_set, order)
+        model = train_ngrams(category_training_set, order, vocabulary_fp)
 
         # interview
         for test_category in os.listdir(base_path):
@@ -117,6 +120,19 @@ def write_csv(subject_interview_perplexity, out_file):
 
     with open(out_file, 'w') as f:
         f.write(csv)
+
+def build_vocabulary_file(vocabulary_fp):
+    all_text = ""
+    for category in os.listdir(configuration.experiment1_data_base_path):
+        if not category.startswith(".") and category != "all_transcripts.txt":
+            category_folder = configuration.experiment1_data_base_path + category + "/"
+
+            for category_transcript in os.listdir(category_folder):
+                category_file = category_folder + category_transcript
+                file_content = open(category_file, 'r').read()
+                all_text += file_content + "\n"
+
+    open(vocabulary_fp, 'w').write(all_text)
 
 
 if __name__ == '__main__':

@@ -1,5 +1,6 @@
 from config import configuration
 from tqdm import tqdm
+import os
 
 from experiments.experiment3_gpt2 import build_leave_one_out, get_partition_subjects_dictionary, build_all_data, \
     preprocess_pitt_corpus_data
@@ -20,8 +21,12 @@ def run_experiment(order):
     # Preprocessing CHAT files
     preprocess_pitt_corpus_data()
 
-    # Generate Concatenation of all files
+    # Generate Concatenation of all files to train the "other" LM
     build_all_data()
+
+    # Build a single vocabulary to train n-grams
+    vocabulary_fp = '../resources/data/experiment3/input/all_transcripts.txt'
+    build_vocabulary_file(vocabulary_fp)
 
     # ------------------------------------------------------- #
     #          1. Train Single LM on ALL Control group        #
@@ -32,11 +37,11 @@ def run_experiment(order):
     with open(all_control_train_file_path, 'r') as f:
         text = f.read()
 
-    model_all_control = train_ngrams(text, order)
+    model_all_control = train_ngrams(text, order, vocabulary_fp)
     print("Training has been completed!")
 
     # ------------------------------------------------------- #
-    #          2. Train Single LM on ALL Dementia group       #
+    #          2. Train Single LM on ALL AD group             #
     # ------------------------------------------------------- #
     all_dementia_train_file_path = data_base_path + "ALL/dementia.txt"
 
@@ -44,7 +49,7 @@ def run_experiment(order):
     with open(all_dementia_train_file_path, 'r') as f:
         text = f.read()
 
-    model_all_dementia = train_ngrams(text, order)
+    model_all_dementia = train_ngrams(text, order, vocabulary_fp)
     print("Training has been completed!")
 
     # ------------------------------------------------------- #
@@ -55,13 +60,15 @@ def run_experiment(order):
     control_leave_out_models = {}
     control_data_dir = data_base_path + "control/"
 
+    # For each subject s in the control group, train a LM on the concatenation of
+    # all the transcripts from patients belonging to the control group except for s
     for leave_out_subject_id in tqdm(control_subjects, desc="Training control"):
         train_set_file_path = control_data_dir + "datasets/" + leave_out_subject_id + "/train.txt"
 
-        # --- Train ngrams model for psycho_test_name ---
+        # --- Train ngrams model for subject leave_out_subject_id ---
         with open(train_set_file_path, 'r') as f:
             text = f.read()
-        leave_one_out_model = train_ngrams(text, order)
+        leave_one_out_model = train_ngrams(text, order, vocabulary_fp)
 
         # Store the model in the dictionary
         control_leave_out_models[leave_out_subject_id] = leave_one_out_model
@@ -74,13 +81,15 @@ def run_experiment(order):
     dementia_leave_out_models = {}
     dementia_data_dir = data_base_path + "dementia/"
 
+    # For each subject s in the AD group, train a LM on the concatenation of
+    # all the transcripts from patients belonging to the AD group except for s
     for leave_out_subject_id in tqdm(dementia_subjects, desc="Training dementia"):
         train_set_file_path = dementia_data_dir + "datasets/" + leave_out_subject_id + "/train.txt"
 
-        # --- Train ngrams model for psycho_test_name ---
+        # --- Train ngrams model for subject leave_out_subject_id ---
         with open(train_set_file_path, 'r') as f:
             text = f.read()
-        leave_one_out_model = train_ngrams(text, order)
+        leave_one_out_model = train_ngrams(text, order, vocabulary_fp)
 
         # Store the model in the dictionary
         dementia_leave_out_models[leave_out_subject_id] = leave_one_out_model
@@ -92,7 +101,7 @@ def run_experiment(order):
     # In the following we will exploit the above trained models to compute the perplexity scores for all subjects in
     # the control/dementia group.
 
-    # Final dictionary. Will be in the following form:
+    # Teh final dictionary will be in the following form:
     # {
     #   "control": {
     #       "1": {
@@ -121,6 +130,9 @@ def run_experiment(order):
     # ------------------------------- #
     #  5. Deal with control subjects  #
     # ------------------------------- #
+    #
+    # For each subject s in the Control group, load the LMs acquired on ALL AD group and on the control group
+    # by excluding s; compute the perplexity for s through such models; store the scores in our final dictionary.
     for leave_out_subject_id in tqdm(control_subjects, desc="Perplexity control"):
         # Load above trained leave-out model
         model = control_leave_out_models[leave_out_subject_id]
@@ -128,7 +140,7 @@ def run_experiment(order):
         # Compute the perplexity for the leave-out subject
         for interview_id in control_subjects[leave_out_subject_id]:
 
-            # Load interview text
+            # Load interview text, the test set
             interview_file_path = control_data_dir + leave_out_subject_id + "-" + interview_id + ".txt"
             with open(interview_file_path, 'r') as f:
                 file_content = f.read()
@@ -147,14 +159,15 @@ def run_experiment(order):
                 group_patient_ppl_dictionary["control"][leave_out_subject_id][interview_id] = {}
             group_patient_ppl_dictionary["control"][leave_out_subject_id][interview_id]["p_control"] = avg_ppl
             group_patient_ppl_dictionary["control"][leave_out_subject_id][interview_id]["dev.std_control"] = dev_std
-            group_patient_ppl_dictionary["control"][leave_out_subject_id][interview_id][
-                "p_dementia"] = avg_ppl_dementia
-            group_patient_ppl_dictionary["control"][leave_out_subject_id][interview_id][
-                "dev.std_dementia"] = dev_std_dementia
+            group_patient_ppl_dictionary["control"][leave_out_subject_id][interview_id]["p_dementia"] = avg_ppl_dementia
+            group_patient_ppl_dictionary["control"][leave_out_subject_id][interview_id]["dev.std_dementia"] = dev_std_dementia
 
     # ------------------------------- #
     #  5. Deal with dementia subjects #
     # ------------------------------- #
+    #
+    # For each subject s in the AD group, load the LMs acquired on ALL Control group and on the AD group
+    # by excluding s; compute the perplexity for s through such models; store the scores in our final dictionary.
     for leave_out_subject_id in tqdm(dementia_subjects, desc="Perplexity dementia"):
         # Load above trained leave-out model
         model = dementia_leave_out_models[leave_out_subject_id]
@@ -207,6 +220,16 @@ def write_csv_pitt(group_patient_ppl_dictionary, eval_file):
 
     with open(eval_file, 'w') as f:
         f.write(csv)
+
+def build_vocabulary_file(vocabulary_fp):
+    all_text = ""
+    for category_file_name in os.listdir(configuration.experiment3_data_base_path + "ALL/"):
+        if not category_file_name.startswith("."):
+            category_file_path = configuration.experiment3_data_base_path + "ALL/" + category_file_name
+            file_content = open(category_file_path, 'r').read().replace("\n\n","\n")
+            all_text += file_content + "\n"
+
+    open(vocabulary_fp, 'w').write(all_text)
 
 
 if __name__ == '__main__':
