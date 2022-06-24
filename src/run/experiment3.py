@@ -18,13 +18,18 @@ def main():
     for order in [2,3,4,5]:
         experiment3_ngrams.run_experiment(order)
 
+    # ../resources/data/experiment3/output/[2-grams.csv,3-grams.csv, ...]
+    out_csv = "Model, Rule, Accuracy, Pd, Rd, F1d, Pc, Rc, F1c, HM,Dc>Dad,D^*_c>D^*_ad,Dc,DEVc,Dad,DEVad\n"
     for fn in os.listdir(configuration.experiment3_output_base_path):
-        if fn != "." and fn != "..":
-            eval_perplexity_scores(configuration.experiment3_output_base_path + fn)
+        if fn != "." and fn != ".." and "results" not in fn:
+            results = eval_perplexity_scores(configuration.experiment3_output_base_path + fn)
+            out_csv += results + "\n"
+    open(configuration.experiment3_output_base_path + "results.csv", "w").write(out_csv)
 
 def eval_perplexity_scores(file_path):
     control_dict = {}
     dementia_dict = {}
+    results = ""
 
     # ---------------------------------------------------
     # --- 			Fill patients dictionary		  ---
@@ -33,21 +38,26 @@ def eval_perplexity_scores(file_path):
         epochs = file_path.split("=")[-1].split(".")[0]
     else:
         epochs = file_path.split("-")[0]
-    with open(file_path, 'r') as f:
-        file_content = f.read().split("\n")
+
+    # Read file
+    file_content = open(file_path, 'r').read().split("\n")
 
     for line in file_content:
         line = line.split(",")
         if line[0] != "Group Id" and line[0] != "":
+            # Load data from file
             group_id = line[0]
             subject_id = line[1]
             interview_id = line[2]
             p_control = float(line[3])
             p_dementia = float(line[4])
 
+            # Final dictionaries, one for each group, will be in the following form:
             # 4{
             #   'p_control': [...],
             #   'p_control': [...],
+            #   'c-d': [...],
+            #   'd-c': [...],
             #   'devstd_control': [...],
             #   'devstd_dementia': [...]
             # }
@@ -63,6 +73,7 @@ def eval_perplexity_scores(file_path):
                 if 'd-c' not in dementia_dict[subject_id]:
                     dementia_dict[subject_id]['d-c'] = []
 
+                # Load PPL scores together with differences for the AD group
                 dementia_dict[subject_id]['p_control'].append(p_control)
                 dementia_dict[subject_id]['p_dementia'].append(p_dementia)
                 dementia_dict[subject_id]['c-d'].append(p_control - p_dementia)
@@ -80,18 +91,27 @@ def eval_perplexity_scores(file_path):
                 if 'd-c' not in control_dict[subject_id]:
                     control_dict[subject_id]['d-c'] = []
 
+                # Load PPL scores together with differences for the Control group
                 control_dict[subject_id]['p_control'].append(p_control)
                 control_dict[subject_id]['p_dementia'].append(p_dementia)
                 control_dict[subject_id]['c-d'].append(p_control - p_dementia)
                 control_dict[subject_id]['d-c'].append(p_dementia - p_control)
 
-    # Estimating thresholds with leave one out
+    # --------------------------------- #
+    #      Estimating thresholds        #
+    # --------------------------------- #
+    #
+    # For each subject belonging to the Control group we estimate the thresholds in a leave one out setting.
+    # More precisely, we compute average en standard deviations of all the scores for patients in the Control group
+    # except for s.
+    # The subject s will be the held-out subject.
     for s in control_dict:
         p_control_avg = []
         p_dementia_avg = []
         dc_avg = []
         cd_avg = []
 
+        # For each subject s1 in the Control group, if s1 != s, then add her/his scores to our lists.
         for s1 in control_dict:
             if s != s1:
                 p_control_avg.append(statistics.mean(control_dict[s1]['p_control']))
@@ -99,6 +119,8 @@ def eval_perplexity_scores(file_path):
                 cd_avg.append(statistics.mean(control_dict[s1]['c-d']))
                 dc_avg.append(statistics.mean(control_dict[s1]['d-c']))
 
+        assert len(dc_avg) == len(control_dict)-1 and len(cd_avg) == len(control_dict)-1
+        # Compute average and st.dev from the lists
         control_dict[s]['p_control_avg'] = statistics.mean(p_control_avg)
         control_dict[s]['p_control_std'] = statistics.stdev(p_control_avg)
 
@@ -111,12 +133,17 @@ def eval_perplexity_scores(file_path):
         control_dict[s]['c-d_avg'] = statistics.mean(cd_avg)
         control_dict[s]['c-d_std'] = statistics.stdev(cd_avg)
 
+    # For each subject belonging to the AD group we estimate the thresholds in a leave one out setting.
+    # More precisely, we compute average en standard deviations of all the scores for patients in the AD group
+    # except for s.
+    # The subject s will be the held-out subject.
     for s in dementia_dict:
         p_control_avg = []
         p_dementia_avg = []
         dc_avg = []
         cd_avg = []
 
+        # For each subject s1 in the AD group, if s1 != s, then add her/his scores to our lists.
         for s1 in dementia_dict:
             if s != s1:
                 p_control_avg.append(statistics.mean(dementia_dict[s1]['p_control']))
@@ -124,6 +151,8 @@ def eval_perplexity_scores(file_path):
                 cd_avg.append(statistics.mean(dementia_dict[s1]['c-d']))
                 dc_avg.append(statistics.mean(dementia_dict[s1]['d-c']))
 
+        assert len(dc_avg) == len(dementia_dict) - 1 and len(cd_avg) == len(dementia_dict) - 1
+        # Compute average and st.dev from the lists
         dementia_dict[s]['p_control_avg'] = statistics.mean(p_control_avg)
         dementia_dict[s]['p_control_std'] = statistics.stdev(p_control_avg)
 
@@ -156,6 +185,8 @@ def eval_perplexity_scores(file_path):
     # ---------------------------------------------------
     # ---  			 Compute control avg   		      ---
     # ---------------------------------------------------
+    # We compute the global thresholds by including scores from all the patients
+    # belonging to the Control group.
     control_control_ppl_list = []
     control_dementia_ppl_list = []
     control_diff_cd_ppl_list = []
@@ -184,6 +215,8 @@ def eval_perplexity_scores(file_path):
     # ---------------------------------------------------
     # ---            Compute dementia avg             ---
     # ---------------------------------------------------
+    # We compute the global thresholds by including scores from all the patients
+    # belonging to the AD group.
     dementia_control_ppl_list = []
     dementia_dementia_ppl_list = []
     dementia_diff_cd_ppl_list = []
@@ -215,6 +248,7 @@ def eval_perplexity_scores(file_path):
     print("Control group AVG Ppl difference [Control-Dementia]:", control_diff_cd_avg)
     print("Control group AVG Ppl difference [Dementia-Control]:", control_diff_dc_avg)
     print("Control group STD.DEV Ppl difference [Dementia-Control]:", control_diff_dc_std)
+    # return
 
     print()
 
@@ -223,17 +257,35 @@ def eval_perplexity_scores(file_path):
     print("Dementia group AVG Ppl difference [Control-Dementia]:", dementia_diff_cd_avg)
     print("Dementia group AVG Ppl difference [Dementia-Control]:", dementia_diff_dc_avg)
 
+    print()
+
+    print("### Global thresholds ###")
+    print("Control group Diff. AVG:", control_diff_dc_avg)
+    print("Control group Diff. Dev.STD:", control_diff_dc_std)
+    print("Dementia group Diff. AVG:", dementia_diff_dc_avg)
+    print("Dementia group Diff. Dev.STD:", dementia_diff_dc_std)
+
     print("-" * 50, "\n")
 
-    # --- Control
-    classify_patients_with_threshold(control_dict, dementia_dict, control_control_avg, 'p_control', '<', '>')
+    # --- Control ---
+    acc,pd,rd,fd,pc,rc,fc = classify_patients_with_threshold(control_dict, dementia_dict, control_control_avg, 'p_control', '<', '>')
+    hm = statistics.harmonic_mean([acc,fd,fc])
+    results += file_path.split("/")[-1] + ",Pc," + str(acc) + "," + str(pd) + "," + str(rd) + "," + str(fd) + "," + str(pc) + "," + str(rc) + "," + str(fc) + ","  + str(hm) + "\n"
+    # --- Dementia ---
+    acc,pd,rd,fd,pc,rc,fc = classify_patients_with_threshold(control_dict, dementia_dict, dementia_dementia_avg, 'p_dementia', '>', '<')
+    hm = statistics.harmonic_mean([acc,fd,fc])
+    results += file_path.split("/")[-1] + ",Pd," + str(acc) + "," + str(pd) + "," + str(rd) + "," + str(fd) + "," + str(pc) + "," + str(rc) + "," + str(fc) + ","  + str(hm) + "\n"
 
-    # --- Dementia
-    classify_patients_with_threshold(control_dict, dementia_dict, dementia_dementia_avg, 'p_dementia', '>', '<')
+    # --- D-C ---
+    acc,pd,rd,fd,pc,rc,fc = classify_patients_with_threshold_dev(control_dict, dementia_dict, control_diff_dc_avg, control_diff_dc_std, dementia_diff_dc_avg, dementia_diff_dc_std, 0, file_path.split("/")[-1])
+    hm = statistics.harmonic_mean([acc, fd, fc])
+    results += file_path.split("/")[-1] + ",D," + str(acc) + "," + str(pd) + "," + str(rd) + "," + str(fd) + "," + str(pc) + "," + str(rc) + "," + str(fc) + "," + str(hm) + (",1" if (control_diff_dc_avg>dementia_diff_dc_avg) else ",0") + (",1" if ((control_diff_dc_avg-0*control_diff_dc_std)>(dementia_diff_dc_avg+0*dementia_diff_dc_std)) else ",0") + "," + str(control_diff_dc_avg) + "," + str(control_diff_dc_std) + "," + str(dementia_diff_dc_avg) + "," + str(dementia_diff_dc_std) +  "\n"
+    # --- (D-C)^* ---
+    acc,pd,rd,fd,pc,rc,fc = classify_patients_with_threshold_dev(control_dict, dementia_dict, control_diff_dc_avg, control_diff_dc_std, dementia_diff_dc_avg, dementia_diff_dc_std, 2, file_path.split("/")[-1])
+    hm = statistics.harmonic_mean([acc, fd, fc])
+    results += file_path.split("/")[-1] + ",D*," + str(acc) + "," + str(pd) + "," + str(rd) + "," + str(fd) + "," + str(pc) + "," + str(rc) + "," + str(fc) + "," + str(hm) + (",1" if (control_diff_dc_avg>dementia_diff_dc_avg) else ",0") + (",1" if ((control_diff_dc_avg-2*control_diff_dc_std)>(dementia_diff_dc_avg+2*dementia_diff_dc_std)) else ",0") + "," + str(control_diff_dc_avg) + "," + str(control_diff_dc_std) + "," + str(dementia_diff_dc_avg) + "," + str(dementia_diff_dc_std) +  "\n"
 
-    # --- D-C and (D-C)^* ---
-    classify_patients_with_threshold_dev(control_dict, dementia_dict, control_diff_dc_avg, control_diff_dc_std, dementia_diff_dc_avg, dementia_diff_dc_std, 'd-c', 0)
-    classify_patients_with_threshold_dev(control_dict, dementia_dict, control_diff_dc_avg, control_diff_dc_std, dementia_diff_dc_avg, dementia_diff_dc_std, 'd-c', 2)
+    return results
 
 def classify_patients_with_threshold(control_dict, dementia_dict, threshold, criterion, control_rule, dementia_rule):
 
@@ -307,12 +359,14 @@ def classify_patients_with_threshold(control_dict, dementia_dict, threshold, cri
     print("FP:", fpd)
     print("FN:", fnd)
     print("TN:", tnd)
-    precision = tpd / (tpd + fpd)
-    recall = tpd / (tpd + fnd)
-    print("P:", precision)
-    print("R:", recall)
-    print("F1:", 2 * (precision * recall) / (precision + recall))
+    precisiond = tpd / (tpd + fpd)
+    recalld = tpd / (tpd + fnd)
+    fd = 2 * (precisiond * recalld) / (precisiond + recalld)
+    print("P:", precisiond)
+    print("R:", recalld)
+    print("F1:", fd)
     print()
+    accuracy = ((tpd + tnd) / (tpd + tnd + fpd + fnd))
     print("Accuracy:", (tpd + tnd) / (tpd + tnd + fpd + fnd))
     print()
     print("Detecting Control")
@@ -320,78 +374,102 @@ def classify_patients_with_threshold(control_dict, dementia_dict, threshold, cri
     print("FP:", fpc)
     print("FN:", fnc)
     print("TN:", tnc)
-    precision = 0 if tpc + fpc == 0 else tpc / (tpc + fpc)
-    recall = 0 if tpc + fnc == 0 else tpc / (tpc + fnc)
-    print("P:", precision)
-    print("R:", recall)
-    print("F1:", 0 if precision + recall == 0 else 2 * (precision * recall) / (precision + recall))
+    precisionc = 0 if tpc + fpc == 0 else tpc / (tpc + fpc)
+    recallc = 0 if tpc + fnc == 0 else tpc / (tpc + fnc)
+    print("P:", precisionc)
+    print("R:", recallc)
+    fc = 0 if precisionc + recallc == 0 else 2 * (precisionc * recallc) / (precisionc + recallc)
+    print("F1:", fc)
     print()
+    return accuracy, precisiond,recalld,fd, precisionc, recallc, fc
 
-def classify_patients_with_threshold_dev(control_dict, dementia_dict, tc, devc, td, devd, criterion, m):
+def classify_patients_with_threshold_dev(control_dict, dementia_dict, tc, devc, td, devd, m, model):
+    #
+    # tc: threshold (AVG) computed by employing all the transcripts from the Control group
+    # devc: threshold (standard deviation) computed by employing all the transcripts from the Control group
+    # td: threshold (AVG) computed by employing all the transcripts from the AD group
+    # devd: threshold (standard deviation) computed by employing all the transcripts from the AD group
+    #
 
-    # ---------------------------------------------------
-    # ---       Count dementia recognized patients    ---
-    # ---------------------------------------------------
-
+    # Statistics for the AD group
     tpd = 0.0
     fpd = 0.0
     tnd = 0.0
     fnd = 0.0
 
+    # Statistics for the Control group
     tpc = 0.0
     fpc = 0.0
     tnc = 0.0
     fnc = 0.0
 
+    # Merge all the subjects into a single dictionary, by attaching the label to the subject id.
+    # The label will be exploited to evaluate the classification.
     subjects = {}
     for s in dementia_dict:
         subjects['d_' + s] = dementia_dict[s]
     for s in control_dict:
         subjects['c_' + s] = control_dict[s]
 
+    tod = "Patient, Y pred, Y true, score, Td, Tc\n"
+
     for s in subjects:
+        # Define subject's thresholds as the global thresholds.
         ttd = td
         ddevd = devd
         ttc = tc
         ddevc = devc
 
-        subject_avg_ppl = statistics.mean(subjects[s][criterion])
+        # Get subject average PPL score.
+        subject_avg_ppl = statistics.mean(subjects[s]['d-c'])
         group = s.split("_")[0]
         subject = s.split("_")[1]
-        # \text{if } PPL(i) > \left(\text{avg(D-C)}_{C} - 2\cdot\text{stdev}_{C} \right)\text{ then } C\\
-        # \text{if } PPL(i) < \left(\text{avg(D-C)}_{D} + 2\cdot\text{stdev}_{D} \right)\text{ then } D
 
-        # print("-"*30)
-        # print(ttc,ddevc,ttd,ddevd)
+
+        # The following lines of code show that $s$ was held out with the only purpose to rule out her/his contribution
+        # from $\overline{D}_{AD}$ or $\overline{D}_{C}$.
+        #
+        # Control strategy to compute the thresholds:
+        # If s belongs to the Control group then we set ttc and ddevc to the scores obtained by excluding s.
+        # If s belongs to the AD group then we set ttd and ddevd to the scores obtained by excluding s.
+        #
+        # PLEASE NOTE:
+        # If we are facing an unseen subject we are allowed to adopt global scores td,devd,tc,devc.
+        #
         if group == 'd':
-            ttd = dementia_dict[subject][criterion + '_avg']
-            ddevd = dementia_dict[subject][criterion + '_std']
+            ttd = dementia_dict[subject]['d-c_avg']
+            ddevd = dementia_dict[subject]['d-c_std']
         else:
-            ttc = control_dict[subject][criterion + '_avg']
-            ddevc = control_dict[subject][criterion + '_std']
-        # print(ttc,ddevc,ttd,ddevd)
+            ttc = control_dict[subject]['d-c_avg']
+            ddevc = control_dict[subject]['d-c_std']
 
-        if subject_avg_ppl < ttd + m * ddevd:
-            if group == 'd':
-                tpd += 1.0
-            else:
-                fpd += 1.0
-        else:
-            if group == 'd':
-                fnd += 1.0
-            else:
-                tnd += 1.0
+        # Define \overline{D}_{C} and \overline{D}_{AD}
+        dstarc = ttc - m * ddevc
+        dstard = ttd + m * ddevd
 
-        if subject_avg_ppl > ttc - m * ddevc:
+        # For each subject s, if:
+        #   if |PPL(s) - \overline{D}_{C}| <= |PPL(s) - \overline{D}_{AD}| then we categorize s as Control
+        #   if |PPL(s) - \overline{D}_{C}| > |PPL(s) - \overline{D}_{AD}| then we categorize s as Dementia
+        if abs(subject_avg_ppl-dstarc) <= abs(subject_avg_ppl-dstard):
+            # s has been categorized as Control
             if group == 'c':
                 tpc += 1.0
+                tnd += 1.0
+                tod += s + "," + "C,C," + str(subject_avg_ppl) + "," + str(dstard) + "," + str(dstarc) + "\n"
             else:
                 fpc += 1.0
+                fnd += 1.0
+                tod += s + "," + "C,D," + str(subject_avg_ppl) + "," + str(dstard) + "," + str(dstarc) + "\n"
         else:
-            if group == 'c':
-                fnc += 1.0
-            else:
+            # s has been categorized as Dementia
+            if group == 'd':
+                tpd += 1.0
                 tnc += 1.0
+                tod += s + "," + "D,D," + str(subject_avg_ppl) + "," + str(dstard) + "," + str(dstarc) + "\n"
+            else:
+                fpd += 1.0
+                fnc += 1.0
+                tod += s + "," + "D,C," + str(subject_avg_ppl) + "," + str(dstard) + "," + str(dstarc) + "\n"
 
     # ===================================================
 
@@ -409,12 +487,14 @@ def classify_patients_with_threshold_dev(control_dict, dementia_dict, tc, devc, 
     print("FP:", fpd)
     print("FN:", fnd)
     print("TN:", tnd)
-    precision = tpd / (tpd + fpd)
-    recall = tpd / (tpd + fnd)
-    print("P:", precision)
-    print("R:", recall)
-    print("F1:", 2 * (precision * recall) / (precision + recall))
+    precisiond = 0 if tpd + fpd == 0 else tpd / (tpd + fpd)
+    recalld = 0 if tpd + fnd == 0 else tpd / (tpd + fnd)
+    fd = 0 if precisiond + recalld == 0 else 2 * (precisiond * recalld) / (precisiond + recalld)
+    print("P:", precisiond)
+    print("R:", recalld)
+    print("F1:", fd)
     print()
+    accuracy = ((tpd + tnd) / (tpd + tnd + fpd + fnd))
     print("Accuracy:", (tpd + tnd) / (tpd + tnd + fpd + fnd))
     print()
     print("Detecting Control")
@@ -422,12 +502,19 @@ def classify_patients_with_threshold_dev(control_dict, dementia_dict, tc, devc, 
     print("FP:", fpc)
     print("FN:", fnc)
     print("TN:", tnc)
-    precision = 0 if tpc + fpc == 0 else tpc / (tpc + fpc)
-    recall = 0 if tpc + fnc == 0 else tpc / (tpc + fnc)
-    print("P:", precision)
-    print("R:", recall)
-    print("F1:", 0 if precision + recall == 0 else 2 * (precision * recall) / (precision + recall))
+    precisionc = 0 if tpc + fpc == 0 else tpc / (tpc + fpc)
+    recallc = 0 if tpc + fnc == 0 else tpc / (tpc + fnc)
+    print("P:", precisionc)
+    print("R:", recallc)
+    fc = 0 if precisionc + recallc == 0 else 2 * (precisionc * recallc) / (precisionc + recallc)
+    print("F1:", fc)
     print()
+
+    assert (tpc + fnc) == len(control_dict) and (fpc + tnc) == len(dementia_dict) and (tpd + fnd) == len(dementia_dict) and (fpd + tnd) == len(control_dict)
+
+    open("../resources/data/experiment3/predictions/" + model.replace('.txt','') + "_" + str(m) + "-dev.csv", 'w').write(tod)
+    # exit()
+    return accuracy, precisiond, recalld, fd, precisionc, recallc, fc
 
 
 if __name__ == '__main__':
